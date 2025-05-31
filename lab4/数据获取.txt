@@ -1,0 +1,6 @@
+姿态数据已放在北科云盘中，可通过下方链接直接下载(无需消耗流量)。具体的数据集讲解与说明，请查看数据集介绍PPT。
+https://yunpan.ustb.edu.cn/link/AAF2E7966F57EF4F0EB8E19D89AF36611E
+文件夹名：skeleton
+有效期限：2026-06-19 21:01
+
+预设任务为action分类任务，csv文件命名为subject00x-action00x-move00x.csv，文件名中已包含其为第几个action，可当作label使用。

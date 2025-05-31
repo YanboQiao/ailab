@@ -1,0 +1,185 @@
+\documentclass[UTF8]{ctexart}
+
+%----------- 版式与字体 ----------------
+\usepackage{geometry}
+\geometry{a4paper,margin=2.5cm}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.5em}
+\renewcommand{\baselinestretch}{1.3}
+
+%----------- 列表与颜色 ----------------
+\usepackage[shortlabels]{enumitem}
+\setlist[enumerate]{label=\arabic*.}
+\usepackage{xcolor}
+\usepackage{titlesec}
+
+%----------- 数学宏包 ------------------
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+
+%----------- 题注样式（节标题） ---------
+\titleformat{\section}
+  {\zihao{4}\bfseries}{\chinese{section}、}{0.5em}{}
+\titleformat{\subsection}
+  {\zihao{5}\bfseries}{\arabic{section}.\arabic{subsection}}{0.5em}{}
+
+%----------- 正文开始 ------------------
+\begin{document}
+
+\begin{center}
+  {\zihao{3}\bfseries 人工智能实验报告}\\[1ex]
+  {\zihao{4} 实验一\quad 知识表示、推理与搜索}
+\end{center}
+
+% ----------- 信息栏 -------------------
+\renewcommand{\arraystretch}{1.6}
+\begin{tabular}{p{5cm}p{5.5cm}p{3cm}p{5.5cm}}
+  学院：计算机与通信工程 & 专业：计算机科学与技术 & 班级：计221\\
+  姓名：乔彦博 & 学号：U202242223 & 日期：2025.4.27\\
+\end{tabular}
+
+% ----------- 一、实验目标 --------------
+\section*{实验目标}
+\begin{enumerate}
+  \item 熟练掌握知识表示的多种基本方法，包括状态空间法、产生式系统等，并能根据不同问题灵活选择和运用。
+  \item 准确实现经典搜索算法，如广度优先搜索（\textbf{BFS}）、A\textsuperscript{*}算法（启发式函数）等，理解其算法原理和执行过程。
+  \item \textbf{深入分析不同搜索策略在效率方面的差异，通过实验结果进行可视化、对比和评估。}
+\end{enumerate}
+
+% ----------- 二、实验内容 --------------
+\section*{实验内容（根据实验要求文档）}
+\begin{enumerate}
+%--------------- 1 ---------------------
+  \item 问题描述：
+  \begin{itemize}
+    \item \textbf{八数码问题}：将 $3\times3$ 棋盘视为 9 个位置的状态空间，每个状态用矩阵形式 $((1,2,3),(4,0,6),(7,5,8))$ 表示，其中 0 代表空格。空格可与上下左右的数字交换位置，从而产生新状态。
+    \item \textbf{传教士与野人问题}：用三元组 $(m_{\text{left}},w_{\text{left}},\text{boat\_side})$ 表示左岸传教士人数、野人人数及船的位置（0 表示在右岸，1 表示在左岸）。遵循以下约束：
+      \begin{itemize}
+        \item 船一次可载 1–2 人；
+        \item 任一岸上若有传教士，其数量必须不少于野人数量。
+      \end{itemize}
+    \item \textbf{搜索算法实现要求}：
+      \begin{itemize}
+        \item \textbf{广度优先搜索（BFS）}：保证找到最短路径解，需维护已访问状态集合，记录扩展节点数与解路径长度；
+        \item \textbf{A* 算法}：在 BFS 基础上集成启发式函数，八数码问题使用曼哈顿距离，传教士与野人问题使用左岸总人数作为估计值；
+        \item 对比分析两种算法在节点扩展量、运行时间上的差异，评估启发式函数对搜索效率的影响。
+      \end{itemize}
+  \end{itemize}
+
+%--------------- 2 ---------------------
+  \item \textbf{实现工具：}
+  \begin{itemize}
+    \item \textbf{编程语言}\quad Python 3.11.12（macOS Apple Silicon 原生支持，单线程即可满足实验规模）；
+    \item \textbf{主要库依赖}
+      \begin{itemize}
+        \item \texttt{collections.deque}：O(1) 双端队列，用于 BFS；
+        \item \texttt{heapq}：二叉最小堆，实现 A\textsuperscript{*} 优先队列；
+        \item \texttt{time}：高精度计时（\texttt{perf\_counter()}）；
+        \item \texttt{numpy}：矩阵操作（八数码可选）；
+        \item \texttt{matplotlib}：性能结果可视化。
+      \end{itemize}
+    \item \textbf{开发环境}\quad VS Code +\;Jupyter Notebook，启用 \texttt{-Xfrozen\_modules} 以缩短启动时间。
+  \end{itemize}
+
+%--------------- 3 ---------------------
+  \item \textbf{实现方案：}
+  \begin{enumerate}[label=(\alph*)]
+    \item \textbf{状态设计}
+      \begin{itemize}
+        \item 八数码：定长元组 \verb|Board = Tuple[Tuple[int,...],...]|，并预生成 \verb|GOAL_POS| 以 O(1) 计算曼哈顿距离；
+        \item 传教士与野人：三元组 \verb|State = (ml, cl, boat)|，总合法状态 $\le 32$，便于调试。
+      \end{itemize}
+    \item \textbf{搜索骨架}
+      \begin{itemize}
+        \item 公共父类 \verb|Node| 保存 \verb|state|, \verb|g|, \verb|parent|，使用 \verb|dataclass(slots=True)|；
+        \item BFS 用 \verb|deque|，层次展开；A\textsuperscript{*} 用 \verb|heapq|，按 \(f=g+h\) 取最小。
+      \end{itemize}
+    \item \textbf{启发式函数 \(h\)}
+      \begin{itemize}
+        \item 传教士与野人：\(h = ml + cl + \mathbf{1}_{\text{boat在右}}\)；
+        \item 传教士与野人：\(h = ml + cl + \mathbf{1}_{\text{boat在右}}\)。
+      \end{itemize}
+    \item \textbf{复杂度与边界条件}
+      \begin{itemize}
+        \item 八数码判重基于棋盘哈希；传教士问题每次生成最多 5 个后继并即时过滤非法状态；
+        \item 若输入即为目标，算法 O(1) 返回；若无解（如八数码奇偶错位）抛出 \verb|RuntimeError|。
+      \end{itemize}
+  \end{enumerate}
+
+%--------------- 4 ---------------------
+  \item \textbf{实现内容与实验结果：}
+  \begin{enumerate}[label=(\alph*)]
+    \item \textbf{核心代码结构}
+      \begin{itemize}
+        \item \verb|eight_puzzle_search.py|：实现 BFS 与 A\textsuperscript{*}，附 \verb|demo()|；
+        \item \verb|missionaries_cannibals_search.py|：同上；
+        \item 统一接口：\verb|bfs(start)| / \verb|a_star(start)| → \verb|(path, expanded, elapsed)|。
+      \end{itemize}
+    \item \textbf{实验流程}
+      \begin{enumerate}[label=\roman*.]
+        \item 设定初始状态；
+        \item 分别调用 BFS 与 A\textsuperscript{*}；
+        \item 记录路径长度、扩展节点数、耗时；
+        \item 可多次测量取均值；
+        \item 用 \texttt{matplotlib} 绘制条形图比较。
+      \end{enumerate}
+    \item \textbf{实验结果摘要}
+      \begin{center}
+        \begin{tabular}{lcccc}
+          \hline
+          \textbf{问题} & \textbf{算法} & \textbf{路径长度} & \textbf{扩展节点} & \textbf{运行时间/s} \\
+          \hline
+          八数码 & BFS & 2 & 2 & 0.0000 \\
+          八数码 & A$^{*}$ & 2 & 2 & 0.0000 \\
+          传教士与野人 & BFS & 11 & 13 & $5.1\times10^{-5}$ \\
+          传教士与野人 & A$^{*}$ & 11 & 14 & $4.4\times10^{-5}$ \\
+          \hline
+        \end{tabular}
+      \end{center}
+\vspace{0.5em}
+\noindent
+\textbf{可视化示例代码节选}：
+\begin{verbatim}
+import matplotlib.pyplot as plt
+labels = ['8-Puzzle', 'Missionaries']
+bfs_nodes = [2, 13]
+astar_nodes = [2, 14]
+x = range(len(labels))
+plt.bar(x, bfs_nodes, label='BFS')
+plt.bar(x, astar_nodes, bottom=bfs_nodes, label='A*')
+plt.ylabel('Expanded Nodes')
+plt.xticks(x, labels)
+plt.legend(); plt.show()
+\end{verbatim}
+  \end{enumerate}
+\end{enumerate}
+
+% ---------------- 实验总结 ----------------
+\section*{实验总结}
+
+\textbf{1．实验结论}  
+BFS 作为无启发盲目搜索，在浅层或状态空间极小问题上已能快速找到最优解；但随着深度增长，其节点爆炸现象明显。  
+A$^{*}$ 依赖启发式函数质量：  
+\begin{itemize}
+  \item 对八数码，简单曼哈顿距即可显著剪枝（在更深乱序样例中扩展节点可减少数十倍）；  
+  \item 对传教士与野人，由于状态空间仅 32 个结点，弱启发式并未体现优势，甚至出现 1 个结点的轻微反超。
+\end{itemize}
+
+\textbf{2．启发式函数的作用}  
+曼哈顿距满足可采纳（不高估）与一致性（$h(n) \leq c(n,n') + h(n')$），保证 A$^{*}$ 找到最优解且不重复扩展。  
+若以 Pattern Data\-base 等更强启发式替换，可继续降低时间／空间复杂度，体现“\emph{领域知识 $\Rightarrow$ 搜索效率}”这一核心思想。
+
+\textbf{3．存在问题与改进方向}  
+\begin{enumerate}[label=(\alph*)]
+  \item \textbf{随机化难例}：八数码随机打乱 ≥ 20 步，能更直观展示 A$^{*}$ 优势；  
+  \item \textbf{启发式优化}：传教士问题可改用 $\lceil (ml+cl)/2 \rceil$ 作为最少渡河轮次下界；  
+  \item \textbf{算法拓展}：实现 IDS（深度迭代加深）或双向 A$^{*}$，在有向无障碍图中可进一步加速；  
+  \item \textbf{性能评估}：加入峰值队列长度及内存 Profiling，获得更全面的资源消耗曲线。
+\end{enumerate}
+
+\textbf{4．收获与体会}  
+通过本实验深刻体会到：\emph{“搜索策略选择 + 启发式设计”} 才是 AI 问题求解效率的关键。掌握统一的搜索框架后，投入时间打磨启发式往往收益最高。此外，严谨的实验统计与可视化可帮助我们快速定位瓶颈、迭代算法。
+）
+
+\end{document}
