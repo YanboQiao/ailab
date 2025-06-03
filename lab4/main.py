@@ -11,8 +11,9 @@ import torch.nn as nn
 import torch.optim as optim
 
 from model  import ActionClassifier
-from utils  import (get_device, SkeletonDataset, evaluate_metrics,
+from utils  import (get_device, evaluate_metrics,
                     plot_confusion_matrix, plot_roc)
+from skeleton_utils import EnhancedSkeletonDataset
 
 # ----------------------------------------------------------------------
 def random_split(csv_list, train_ratio=0.9, seed=None):
@@ -46,6 +47,19 @@ def main():
                     help="随机种子 (设定可复现)")
     ap.add_argument("--ckpt-dir",  type=str, default="checkpoints",
                     help="模型保存文件夹")
+    # 数据增强参数
+    ap.add_argument("--augment", action="store_true", 
+                    help="启用数据增强")
+    ap.add_argument("--noise-std", type=float, default=0.02,
+                    help="高斯噪声标准差")
+    ap.add_argument("--time-stretch-range", type=float, nargs=2, default=[0.8, 1.2],
+                    help="时间伸缩范围 [min, max]")
+    ap.add_argument("--spatial-scale-range", type=float, nargs=2, default=[0.9, 1.1],
+                    help="空间缩放范围 [min, max]")
+    ap.add_argument("--rotation-angle", type=float, default=15.0,
+                    help="旋转角度范围 (度)")
+    ap.add_argument("--crop-ratio", type=float, default=0.1,
+                    help="时间裁剪比例")
     args = ap.parse_args()
 
     pathlib.Path(args.ckpt_dir).mkdir(parents=True, exist_ok=True)
@@ -62,8 +76,20 @@ def main():
           f"{len(train_files)} train / {len(test_files)} test")
 
     # ---------------- 2. 数据集 ----------------
-    train_ds = SkeletonDataset(train_files)
-    test_ds  = SkeletonDataset(test_files)
+    # 配置数据增强参数
+    augmentation_config = None
+    if args.augment:
+        augmentation_config = {
+            'noise_std': args.noise_std,
+            'time_stretch_range': args.time_stretch_range,
+            'spatial_scale_range': args.spatial_scale_range,
+            'rotation_angle_deg': args.rotation_angle,
+            'crop_ratio': args.crop_ratio
+        }
+        print(f"[INFO] 启用数据增强: {augmentation_config}")
+    
+    train_ds = EnhancedSkeletonDataset(train_files, augmentation_config=augmentation_config)
+    test_ds  = EnhancedSkeletonDataset(test_files)  # 测试集不进行数据增强
 
     feat_dim = max(train_ds.feature_dim, test_ds.feature_dim)
     pad_feature_dim(train_ds, feat_dim)
@@ -75,11 +101,16 @@ def main():
         test_ds,  batch_size=args.batch_size, shuffle=False)
 
     # ---------------- 3. 标签压缩 ----------------
-    org_labels = [int(l) for l in train_ds.labels + test_ds.labels]
+    # 新的数据集返回的标签已经是数值形式
+    org_labels = train_ds.labels + test_ds.labels
+    # 转换为整数列表
+    org_labels = [int(l.item() if hasattr(l, 'item') else l) for l in org_labels]
     uniq       = sorted(set(org_labels))
     old2new    = {o:i for i, o in enumerate(uniq)}
-    for ds in (train_ds, test_ds):
-        ds.labels = [torch.tensor(old2new[int(l)]) for l in ds.labels]
+    
+    # 重新映射标签
+    train_ds.labels = [torch.tensor(old2new[int(l.item() if hasattr(l, 'item') else l)]) for l in train_ds.labels]
+    test_ds.labels = [torch.tensor(old2new[int(l.item() if hasattr(l, 'item') else l)]) for l in test_ds.labels]
 
     num_cls   = len(uniq)
     cls_names = [str(o) for o in uniq]
